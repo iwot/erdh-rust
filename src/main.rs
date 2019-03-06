@@ -3,6 +3,7 @@ extern crate serde_derive;
 extern crate serde_yaml;
 extern crate mylib;
 extern crate getopts;
+
 use std::{env, process};
 use getopts::Options;
 use std::fs::File;
@@ -10,14 +11,14 @@ use std::io::{Write, BufWriter};
 
 #[derive(Debug)]
 struct Args {
-  config_path: String,
-  output_path: String,
+    config_path: String,
+    output_path: String,
 }
 
 fn print_usage(program: &str, opts: &Options) {
-  let brief = format!("Usage: {} [options]", program);
-  print!("{}", opts.usage(&brief));
-  process::exit(0);
+    let brief = format!("Usage: {} [options]", program);
+    print!("{}", opts.usage(&brief));
+    process::exit(0);
 }
 
 fn parse_args() -> Option<Args> {

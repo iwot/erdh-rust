@@ -1,7 +1,8 @@
 extern crate sqlite3;
 extern crate nom_sql;
 extern crate regex;
-use super::super::erdh::erdh_data::{Construction, Table, Column};
+
+use super::super::erdh::erdh_data::{Construction, Table, Column, ForeignKey, get_relations_from_foreign_keys};
 use super::super::config::db_config::DbConfig;
 use regex::Regex;
 use std::path::Path;
@@ -27,7 +28,7 @@ pub fn read_db(config: &DbConfig) -> Construction {
     }
 }
 
-/// Vec<(テーブル名, クリエイト文)>を返す。
+/// return Vec<(table name, create query)>
 pub fn read_table_creates(conn: &sqlite3::Connection) -> Vec<(String, String)> {
     let mut result = vec![];
 
@@ -55,8 +56,8 @@ fn parse_create_query(create_query: &str, db_name: &str, table_name: &str) -> Op
                     match c {
                         nom_sql::ColumnConstraint::DefaultValue(v) => {
                             default_value = Some(v.to_string());
-                        },
-                        _ => {},
+                        }
+                        _ => {}
                     };
                 }
                 columns.push(
@@ -72,29 +73,48 @@ fn parse_create_query(create_query: &str, db_name: &str, table_name: &str) -> Op
                 );
             }
 
+            let foreign_keys = if let Some(ref fkeys) = &q.fkeys {
+                let mut res = vec![];
+                for f in fkeys {
+                    for i in 0..f.from.len() {
+                        res.push(ForeignKey {
+                            constraint_name: f.name.clone().unwrap_or("".to_string()),
+                            column_name: f.from[i].name.clone(),
+                            referenced_table_name: f.that_table.name.clone(),
+                            referenced_column_name: f.to[i].name.clone(),
+                        });
+                    }
+                }
+                res
+            } else {
+                vec![]
+            };
+            // foreign_keys から ex_relations を生成
+            let ex_relations = get_relations_from_foreign_keys(&foreign_keys);
+
             let table = Table {
                 table: table_name.to_string(),
                 group: db_name.to_string(),
                 columns: columns,
-                indexes : vec![],
-                foreign_keys : vec![],
-                ex_relations: vec![],
+                indexes: vec![],
+                foreign_keys: foreign_keys,
+                ex_relations: ex_relations,
                 is_master: None,
             };
 
             Some(table)
-        },
+        }
         Err(e) => {
             println!("create query parsing failed => {}", create_query);
             dbg!(e);
 
             None
-        },
+        }
         _ => {
             println!("unexpected data found");
 
             None
-        },
+        }
     };
 
     result
